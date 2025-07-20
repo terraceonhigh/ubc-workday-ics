@@ -8,14 +8,14 @@ def get_events(df):
     events = []
     today = datetime.now()
     ical_format = "%Y%m%dT%H%M%S"
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         course = row["Course Listing"]
-        dates = row["Meeting Patterns"]
-        if type(dates) == float:
+        meeting_patterns = row["Meeting Patterns"]
+        if type(meeting_patterns) == float:
             continue
-        dates = str(dates)
-        date_lines = dates.split("\n")
-        date_separators = map(lambda section : section.split("|"), filter(lambda line : len(line) > 0, date_lines))
+        meeting_patterns = str(meeting_patterns)
+        date_lines = meeting_patterns.split("\n")
+        date_separators: map[list[str]] = map(lambda section : section.split("|"), filter(lambda line : len(line) > 0, date_lines))
         for section in date_separators:
             start_end = section[0].strip().split(" ")
             start_date = start_end[0]
@@ -29,12 +29,14 @@ def get_events(df):
             datetimes_end = pd.to_datetime(start_date_end, format="%Y-%m-%d %I:%M %p")
             valid_days = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
             days_formatted = ",".join(filter(lambda da: da in valid_days, map(lambda day : day.upper()[0:2], days)))
+            location = section[3]
             event = f"""BEGIN:VEVENT
 DTSTAMP:{today.strftime("%Y%m%dT%H%M%SZ")} 
 DTSTART;TZID=America/Vancouver:{datetimes_start.strftime(ical_format)}
 DTEND;TZID=America/Vancouver:{datetimes_end.strftime(ical_format)}
 RRULE:FREQ=WEEKLY;BYDAY={days_formatted};UNTIL={end_date.strftime("%Y%m%dT%H%M%SZ")}
 SUMMARY:{course}
+LOCATION:{location}
 END:VEVENT"""
             events.append(event)
     return events
