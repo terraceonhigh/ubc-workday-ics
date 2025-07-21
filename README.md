@@ -1,18 +1,11 @@
 # UBC Workday Excel to ICS CLI Tool
 
-## Issues and Incomplete Features
-
-I am not sure how robust this works with other peoples calendars. 
-
-Still need to edit an make it readable so if you are reading this I am sorry! +
-testing + ... I am using fizz to stress test then I'll put it on reddit.
-
 ## Installation
 
 Clone this repo:
 
 ```
-git clone https://github.com/ChayceJRoss/ubc-workday-ics.git
+git clone https://github.com/terraceonhigh/ubc-workday-ics.git
 ```
 
 To install run:
@@ -54,16 +47,15 @@ e.g.
 5. Run:
 
 ```
-python workday_ics.py Current_Schedule.xlsx calendar.ics
+python workday_ics.py Current_Schedule.xlsx calendar.ics --reminder 30,10
 ```
 
 6. I woud reccomend making a new calendar in your calendar software incase this
    does not work. Then upload the ics file to there.
 
-## Help
-
-Use:
+## Options
 
 ```
-python workday_ics.py --help
+--help
+--reminder (comma seperated, minute values for setting reminders)
 ```
