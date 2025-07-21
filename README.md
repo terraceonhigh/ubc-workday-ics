@@ -1,5 +1,7 @@
 # UBC Workday Excel to ICS CLI Tool
 
+This Python tool converts your Workday class schedule into a .ics file you can use in Apple Calendar, Proton Calendar, or any other iCalendar compatible online calendaring service.
+
 ## Installation
 
 Clone this repo:
