@@ -53,6 +53,14 @@
     #status.error { background: rgba(244,67,54,0.15); }
     .footer { margin-top: 2.5rem; font-size: 0.85rem; color: #666; }
     a { color: #4a90e2; }
+    details.howto {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: #666;
+    }
+    details.howto summary { cursor: pointer; }
+    details.howto ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+    details.howto li { margin: 0.25rem 0; }
   </style>
 </head>
 <body>
@@ -62,6 +70,15 @@
     <code>.ics</code> file you can import into any calendar app.
     Everything runs in your browser — your schedule never leaves your computer.
   </p>
+
+  <details class="howto" open>
+    <summary>How to get your Workday Excel file</summary>
+    <ol>
+      <li>Sign in at <a href="https://myworkday.ubc.ca" target="_blank" rel="noopener">myworkday.ubc.ca</a>.</li>
+      <li>Open <strong>Academics</strong>, then the <strong>Registration &amp; Courses</strong> tab.</li>
+      <li>In the <strong>Current Schedule</strong> block, click the settings wheel and download the Excel file (<code>Current_Schedule.xlsx</code>).</li>
+    </ol>
+  </details>
 
   <label class="drop" id="drop">
     <input type="file" id="file" accept=".xlsx">
