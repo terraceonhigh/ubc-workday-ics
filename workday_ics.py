@@ -1,7 +1,21 @@
-import sys
+# ubc-workday-ics — convert UBC Workday schedule exports to .ics
+# Copyright (C) 2026 Chayce Ross and contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import pandas as pd
 from datetime import datetime
-import click
 
 class IcsRRule:
     def __init__(self, freq: str, byday: str, until: str):
@@ -19,20 +33,20 @@ class IcsVAlarm:
     def ToString(self)->str:
         return f"""BEGIN:VALARM
 ACTION:{self.action}
-TRIGGER;VALUE=DURATION:-PT{self.trigger}M  
+TRIGGER;VALUE=DURATION:-PT{self.trigger}M
 DESCRIPTION:{self.description}
 END:VALARM
 """
 
 class IcsEvent:
-    def __init__(self, dtstamp: str, dtstart: str, dtend: str, rrule: IcsRRule, summary: str, location: str, valarms: list[IcsVAlarm] = []):
+    def __init__(self, dtstamp: str, dtstart: str, dtend: str, rrule: IcsRRule, summary: str, location: str, valarms: list = None):
         self.dtstamp  = dtstamp
         self.dtstart  = dtstart
         self.dtend = dtend
         self.rrule = rrule
         self.summary = summary
         self.location = location
-        self.valarms = valarms
+        self.valarms = valarms if valarms is not None else []
     def ToString(self)->str:
         valarms = ""
         for valarm in self.valarms:
@@ -49,8 +63,7 @@ END:VEVENT
 """
 
 
-# TODO Make look nice, add instructions for downloading the right calendar file and add author tag.
-def get_events(df: pd.DataFrame) -> list[IcsEvent]:
+def get_events(df: pd.DataFrame) -> list:
     events = []
     today = datetime.now()
     ical_format = "%Y%m%dT%H%M%S"
@@ -61,7 +74,7 @@ def get_events(df: pd.DataFrame) -> list[IcsEvent]:
             continue
         meeting_patterns = str(meeting_patterns)
         date_lines = meeting_patterns.split("\n")
-        date_separators: map[list[str]] = map(lambda section : section.split("|"), filter(lambda line : len(line) > 0, date_lines))
+        date_separators = map(lambda section : section.split("|"), filter(lambda line : len(line) > 0, date_lines))
         for section in date_separators:
             start_end = section[0].strip().split(" ")
             start_date = start_end[0]
@@ -76,16 +89,16 @@ def get_events(df: pd.DataFrame) -> list[IcsEvent]:
             valid_days = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
             days_formatted = ",".join(filter(lambda da: da in valid_days, map(lambda day : day.upper()[0:2], days)))
             location = section[3]
-            event = IcsEvent(today.strftime("%Y%m%dT%H%M%SZ"), 
-                             datetimes_start.strftime(ical_format), 
+            event = IcsEvent(today.strftime("%Y%m%dT%H%M%SZ"),
+                             datetimes_start.strftime(ical_format),
                              datetimes_end.strftime(ical_format),
                              IcsRRule("WEEKLY", days_formatted, end_date.strftime("%Y%m%dT%H%M%SZ")),
-                             course, 
-                             location) 
+                             course,
+                             location)
             events.append(event)
     return events
 
-def get_alarms(events: list[IcsEvent], reminder: str):
+def get_alarms(events: list, reminder: str):
     times = reminder.split(",")
     if reminder == "":
         return
@@ -97,12 +110,11 @@ def get_alarms(events: list[IcsEvent], reminder: str):
         event.valarms = alarms
 
 
-def get_ics(events: list[IcsEvent], author: str):
+def get_ics(events: list, author: str):
     today = datetime.now()
     events_string = ''
     for event in events:
         events_string += event.ToString()
-    today_edited = today.strftime("%Y%m%dT%H%M%SZ")
     return f"""BEGIN:VCALENDAR
 PRODID:{author}
 VERSION:2.0
@@ -129,19 +141,26 @@ END:VTIMEZONE
 {events_string}
 END:VCALENDAR"""
 
-@click.command()
-@click.argument("source", type=click.Path(exists=True) )
-@click.argument("destination", type=click.File("wb")) 
-@click.option("--author", default="DEFAULT", help="Name of author for ical file.")
-@click.option("--reminder", default="", help="Set a reminder the specified minutes before event, seperate values by comma")
-def main(source, destination, author, reminder):
-    print(source)
-    df = pd.read_excel(source, dtype=str)
-    events = get_events(df)
-    get_alarms(events, reminder)
-    ics_string = get_ics(events, author)
-    click.echo(ics_string)
-    destination.write(ics_string.encode(encoding="utf-8"))
+
+def _cli():
+    import click
+
+    @click.command()
+    @click.argument("source", type=click.Path(exists=True))
+    @click.argument("destination", type=click.File("wb"))
+    @click.option("--author", default="DEFAULT", help="Name of author for ical file.")
+    @click.option("--reminder", default="", help="Set a reminder the specified minutes before event, seperate values by comma")
+    def main(source, destination, author, reminder):
+        print(source)
+        df = pd.read_excel(source, dtype=str)
+        events = get_events(df)
+        get_alarms(events, reminder)
+        ics_string = get_ics(events, author)
+        click.echo(ics_string)
+        destination.write(ics_string.encode(encoding="utf-8"))
+
+    main()
+
 
 if __name__ == "__main__":
-    main()
+    _cli()
