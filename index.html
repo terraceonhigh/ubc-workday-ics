@@ -1,0 +1,179 @@
+<!--
+  ubc-workday-ics — convert UBC Workday schedule exports to .ics
+  Copyright (C) 2026 Chayce Ross and contributors
+  Licensed under GNU GPLv3 or later. See LICENSE.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>UBC Workday → ICS</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .sub { color: #666; margin-top: 0; font-size: 0.9rem; }
+    .drop {
+      border: 2px dashed #888;
+      border-radius: 8px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .drop.dragover { border-color: #4a90e2; background: rgba(74,144,226,0.08); }
+    .drop input { display: none; }
+    label.field { display: block; margin: 1rem 0 0.25rem; font-size: 0.9rem; }
+    input[type="text"] {
+      width: 100%; box-sizing: border-box;
+      padding: 0.5rem; border: 1px solid #888; border-radius: 4px;
+      font: inherit;
+    }
+    button {
+      margin-top: 1.25rem; padding: 0.6rem 1.2rem;
+      font: inherit; border: 0; border-radius: 4px;
+      background: #4a90e2; color: white; cursor: pointer;
+    }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    #status {
+      margin-top: 1rem; padding: 0.75rem; border-radius: 4px;
+      font-size: 0.9rem; white-space: pre-wrap;
+    }
+    #status.info  { background: rgba(74,144,226,0.1); }
+    #status.ok    { background: rgba(76,175,80,0.15); }
+    #status.error { background: rgba(244,67,54,0.15); }
+    .footer { margin-top: 2.5rem; font-size: 0.85rem; color: #666; }
+    a { color: #4a90e2; }
+  </style>
+</head>
+<body>
+  <h1>UBC Workday → ICS</h1>
+  <p class="sub">
+    Drop your <code>Current_Schedule.xlsx</code> from Workday. Get an
+    <code>.ics</code> file you can import into any calendar app.
+    Everything runs in your browser — your schedule never leaves your computer.
+  </p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".xlsx">
+    <span id="droplabel">Click or drop your Workday Excel file here</span>
+  </label>
+
+  <label class="field" for="reminder">Reminders (minutes before, comma-separated; optional)</label>
+  <input type="text" id="reminder" placeholder="e.g. 10,30">
+
+  <label class="field" for="author">Calendar name (optional)</label>
+  <input type="text" id="author" placeholder="My Schedule">
+
+  <button id="go" disabled>Loading Python…</button>
+
+  <div id="status" class="info">Loading the Python runtime (≈10–20s on first visit)…</div>
+
+  <p class="footer">
+    Source: <a href="https://github.com/terraceonhigh/ubc-workday-ics">github.com/terraceonhigh/ubc-workday-ics</a>
+    · Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU GPLv3+</a>.
+    Not affiliated with UBC.
+  </p>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const status = (msg, kind = 'info') => {
+      const el = $('status');
+      el.textContent = msg;
+      el.className = kind;
+    };
+
+    let pyodide = null;
+    let fileBytes = null;
+    let fileName = null;
+
+    const drop = $('drop');
+    const fileInput = $('file');
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) acceptFile(e.target.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach((ev) =>
+      drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('dragover'); })
+    );
+    ['dragleave', 'drop'].forEach((ev) =>
+      drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('dragover'); })
+    );
+    drop.addEventListener('drop', (e) => {
+      const f = e.dataTransfer.files[0];
+      if (f) acceptFile(f);
+    });
+
+    async function acceptFile(file) {
+      fileName = file.name;
+      const buf = await file.arrayBuffer();
+      fileBytes = new Uint8Array(buf);
+      $('droplabel').textContent = `Loaded: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+    }
+
+    async function init() {
+      try {
+        pyodide = await loadPyodide();
+        status('Loading pandas + openpyxl…', 'info');
+        await pyodide.loadPackage(['pandas', 'openpyxl']);
+        status('Loading workday_ics module…', 'info');
+        const resp = await fetch('./workday_ics.py');
+        if (!resp.ok) throw new Error(`Could not fetch workday_ics.py (${resp.status})`);
+        const src = await resp.text();
+        pyodide.FS.writeFile('workday_ics.py', src);
+        await pyodide.runPythonAsync('import workday_ics');
+        $('go').disabled = false;
+        $('go').textContent = 'Convert to .ics';
+        status('Ready. Drop your Workday .xlsx and click Convert.', 'ok');
+      } catch (err) {
+        status('Failed to load: ' + err.message, 'error');
+      }
+    }
+
+    $('go').addEventListener('click', async () => {
+      if (!fileBytes) {
+        status('Please drop your Workday .xlsx file first.', 'error');
+        return;
+      }
+      const reminder = $('reminder').value.trim();
+      const author = $('author').value.trim() || 'ubc-workday-ics';
+      try {
+        status('Converting…', 'info');
+        pyodide.FS.writeFile('schedule.xlsx', fileBytes);
+        pyodide.globals.set('reminder_arg', reminder);
+        pyodide.globals.set('author_arg', author);
+        const ics = await pyodide.runPythonAsync(`
+import pandas as pd
+import workday_ics
+df = pd.read_excel('schedule.xlsx', dtype=str)
+events = workday_ics.get_events(df)
+workday_ics.get_alarms(events, reminder_arg)
+workday_ics.get_ics(events, author_arg)
+`);
+        const blob = new Blob([ics], { type: 'text/calendar' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (fileName || 'schedule').replace(/\.xlsx$/i, '') + '.ics';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+        status(`Done. ${a.download} downloaded.`, 'ok');
+      } catch (err) {
+        status('Conversion failed: ' + err.message + '\n\nIf this happens, the file may not be a Workday Current_Schedule.xlsx, or Workday changed the format.', 'error');
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
