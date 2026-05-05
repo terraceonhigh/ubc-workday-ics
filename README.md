@@ -10,7 +10,7 @@ Two ways to use it:
 ## Getting your Workday schedule file
 
 1. Go to [myworkday.ubc.ca](https://myworkday.ubc.ca) and log in.
-2. Open the **Academics** section, then the **Registration** tab.
+2. Open the **Academics** section, then the **Registration & Courses** tab.
 3. In the **Current Schedule** block, click the settings wheel and download the Excel file (`Current_Schedule.xlsx`).
 
 Once you have that file, use either the web app above or the CLI below.
