@@ -123,8 +123,13 @@
     async function init() {
       try {
         pyodide = await loadPyodide();
-        status('Loading pandas + openpyxl…', 'info');
-        await pyodide.loadPackage(['pandas', 'openpyxl']);
+        status('Loading pandas…', 'info');
+        await pyodide.loadPackage(['pandas', 'micropip']);
+        status('Loading openpyxl…', 'info');
+        await pyodide.runPythonAsync(`
+import micropip
+await micropip.install('openpyxl')
+`);
         status('Loading workday_ics module…', 'info');
         const resp = await fetch('./workday_ics.py');
         if (!resp.ok) throw new Error(`Could not fetch workday_ics.py (${resp.status})`);
